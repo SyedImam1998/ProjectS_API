@@ -4,13 +4,19 @@ const multer = require("multer");
 const path = require("path");
 const cors = require("cors");
 const pdf = require("pdf-parse");
+const axios = require("axios");
 const bodyParser = require("body-parser");
-const { createClient } = require("@supabase/supabase-js");
-require('dotenv').config()
-
-const supabaseUrl = process.env.SUPABASE_URL;
-const supabaseKey =process.env.SUPABASE_ANON;
-const supabase = createClient(supabaseUrl, supabaseKey);
+const {
+  extractDetails,
+  saveToSupabase,
+  fetch_Flights_from_DB,
+  flight_Price_Average_Calculator,
+  copyProperties_from_one_to_another_Array,
+  upsertSupbase,
+  calculateDateTillDepature
+} = require("./helper/helperFunctions");
+const { flights } = require("./dataSet/sampleData");
+const { stat } = require("fs");
 
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json({ limit: "10mb" }));
@@ -78,15 +84,39 @@ app.post("/upload-and-save-booking-details", async (req, res) => {
     res.status(400).json({ error: error });
   }
 });
-app.post("/upload-and-save-Flight-changes", async (req, res) => {
+app.post("/upload-and-save-Flight-price-changes", async (req, res) => {
+  const data = req.body;
+
+  try {
+    // Save extracted details to Supabase
+    const result = await saveToSupabase("Flight_Price_Changes", data);
+    res.json({ message: "Data saved to Supabase", result });
+  } catch (error) {
+    console.error("Error processing PDF and saving data:", error);
+    res.status(400).json({ error: error });
+  }
+});
+app.post("/upload-and-save-Investor-pool", async (req, res) => {
+  const data = req.body;
+
+  try {
+    // Save extracted details to Supabase
+    const result = await saveToSupabase("Investor_Pool", data);
+    res.json({ message: "Data saved to Supabase", result });
+  } catch (error) {
+    console.error("Error processing PDF and saving data:", error);
+    res.status(400).json({ error: error });
+  }
+});
+app.post("/upload-and-save-Flight-Average-price", async (req, res) => {
   const data = req.body;
 
   try {
     // Save extracted details to Supabase
     const result = await saveToSupabase(
-      "Flight_Price_Changes",
+      "Flight_Average_Price",
       data,
-      "Price_Change_ID"
+      "Flight_ID"
     );
     res.json({ message: "Data saved to Supabase", result });
   } catch (error) {
@@ -95,64 +125,55 @@ app.post("/upload-and-save-Flight-changes", async (req, res) => {
   }
 });
 
-function extractDetails(text) {
-  // Use regular expressions or string manipulation to extract the details
-  const Booking_ID = /Booking ID: (.+)/.exec(text)?.[1];
-  const Passenger_Wallet_Address = /Passenger Wallet Address: (.+)/.exec(
-    text
-  )?.[1];
-  const Flight_ID = /Flight ID: (.+)/.exec(text)?.[1];
-  const Airline = /Airline: (.+)/.exec(text)?.[1];
-  const Origin = /Origin: (.+)/.exec(text)?.[1];
-  const Destination = /Destination: (.+)/.exec(text)?.[1];
-  const Departure_Date_Time = /Departure Date & Time: (.+)/.exec(text)?.[1];
-  const Arrival_Date_Time = /Arrival Date & Time: (.+)/.exec(text)?.[1];
-  const Seat_Class = /Seat Class: (.+)/.exec(text)?.[1];
-  const Number_of_Seats = /Number of Seats: (.+)/.exec(text)?.[1];
-  const Total_Price = /Total Price: (.+)/.exec(text)?.[1];
-  const Payment_Status = /Payment Status: (.+)/.exec(text)?.[1];
-  const Booking_Status = /Booking Status: (.+)/.exec(text)?.[1];
-  const Booking_Date = /Booking Date: (.+)/.exec(text)?.[1];
-  const Passenger_Custom_ID_1 = /Passenger Custom ID 1: (.+)/.exec(text)?.[1];
-  const Emission_per_Passenger = /Emission per Passenger: (.+)/.exec(text)?.[1];
-  const Total_Emission = /Total Emission: (.+)/.exec(text)?.[1];
+// **************** Duffle Data API  **************
+app.get("/duffle-Flight-Data", (req, res) => {
+  res.json(flights).status(200);
+});
 
-  return {
-    Booking_ID,
-    Passenger_Wallet_Address,
-    Flight_ID,
-    Airline,
-    Origin,
-    Destination,
-    Departure_Date_Time,
-    Arrival_Date_Time,
-    Seat_Class,
-    Number_of_Seats,
-    Total_Price,
-    Payment_Status,
-    Booking_Status,
-    Booking_Date,
-    Passenger_Custom_ID_1,
-    Emission_per_Passenger,
-    Total_Emission,
-  };
-}
+// ********* Job to pull data from Duffle and put in Supbase *********
 
-async function saveToSupabase(tableName, uploaddData, PK) {
-  const { data, error } = await supabase
-    .from(tableName) // Adjust the table name as needed
-    .upsert([uploaddData], { onConflict: [PK] }); // Upsert data using bookingId as the conflict key
-
-  console.log("data", data);
-
-  if (error) {
-    console.error("Error saving data to Supabase:", error);
-    throw new Error("Something went wrong while saving");
-    // return { success: false, error };
+app.post("/insert-duffle-data-to-supabase", async (req, res) => {
+  try {
+    const resposne = await axios.get(
+      "http://localhost:3500/duffle-Flight-Data"
+    );
+    const result = await saveToSupabase("Flight_Price_Changes", resposne.data);
+    res.json("Duffle Data Sent to Supbase DB").status(200);
+  } catch (e) {
+    console.log("Error", e);
+    res.json("Went wrong while pushing duffle data to Supbase").status(400);
   }
+});
 
-  return { success: true, data };
-}
+app.post("/insert-flight-avgerage-price", async (req, res) => {
+  try {
+    const flightsDB = await fetch_Flights_from_DB();
+
+    const averagePriceEachFlight = flight_Price_Average_Calculator(flightsDB);
+
+    const propertiesToCopy = [
+      "Flight_ID",
+      "Airline",
+      "Origin",
+      "Destination",
+      "Departure_Date_Time",
+    ];
+    const modifiedArray = copyProperties_from_one_to_another_Array(
+      flightsDB,
+      averagePriceEachFlight,
+      propertiesToCopy
+    );
+   
+    const finalArray=calculateDateTillDepature(modifiedArray);
+    console.log('finalArray', finalArray);
+
+    const saveToSupabase = await upsertSupbase("Flight_Average_Price", finalArray);
+    res.json("Average Of Each Flight Saved on SupaBase").status(200);
+  } catch (e) {
+    console.log('Error:', e)
+    res.json(e).status(400);
+  }
+});
 
 app.get("/", (req, res) => {
   res.send("Imam");
