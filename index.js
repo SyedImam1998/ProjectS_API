@@ -13,10 +13,11 @@ const {
   flight_Price_Average_Calculator,
   copyProperties_from_one_to_another_Array,
   upsertSupbase,
-  calculateDateTillDepature
+  calculateDateTillDepature,
 } = require("./helper/helperFunctions");
 const { flights } = require("./dataSet/sampleData");
 const { stat } = require("fs");
+const { mintSBT } = require("./Components/mintComponent");
 
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json({ limit: "10mb" }));
@@ -163,20 +164,42 @@ app.post("/insert-flight-avgerage-price", async (req, res) => {
       averagePriceEachFlight,
       propertiesToCopy
     );
-   
-    const finalArray=calculateDateTillDepature(modifiedArray);
-    console.log('finalArray', finalArray);
 
-    const saveToSupabase = await upsertSupbase("Flight_Average_Price", finalArray);
+    const finalArray = calculateDateTillDepature(modifiedArray);
+    console.log("finalArray", finalArray);
+
+    const saveToSupabase = await upsertSupbase(
+      "Flight_Average_Price",
+      finalArray
+    );
     res.json("Average Of Each Flight Saved on SupaBase").status(200);
   } catch (e) {
-    console.log('Error:', e)
+    console.log("Error:", e);
     res.json(e).status(400);
+  }
+});
+
+app.post("/insert-PoolsContract_From_Destination_Tracker", async (req, res) => {
+  try {
+    const data = req.body;
+    const saveDB = await saveToSupabase(
+      "PoolsContract_From_Destination_Tracker",
+      [data]
+    );
+    if (saveDB.success) {
+      res.json("Saved on Supabase");
+    }
+  } catch (e) {
+    res.json("some things went wrong");
   }
 });
 
 app.get("/", (req, res) => {
   res.send("Imam");
+});
+
+app.post("/mintSBT", (req, res) => {
+  mintSBT(req.body.address, req, res);
 });
 app.listen("3500", () => {
   console.log("server running at port 3500");
