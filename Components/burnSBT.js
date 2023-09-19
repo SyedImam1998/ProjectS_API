@@ -3,35 +3,40 @@ const { supabase } = require("../config/supaBaseConfig");
 
 async function burnSBT(req, res) {
   try {
-    let { data: User_Accounts, error } = await supabase
-      .from("User_Accounts")
-      .select("*")
-      .eq("WC_address", req.body.WC_address);
-
-    let linked_address_array = User_Accounts[0].linked_address.split(",");
-    let checkAddress = linked_address_array.find(
-      (addr) => addr === req.body.link_new_address
+    const contract = contractSetup(req.body.network);
+    const tokenId = await contract.gettokenIdByAddress(
+      req.body.link_new_address
     );
-
-    if (checkAddress) {
-      const newArray = linked_address_array.filter(
-        (item) => item !== req.body.linked_address
-      );
-      const { data, error2 } = await supabase
-        .from("User_Accounts")
-        .update({ linked_address: newArray.toString() })
-        .eq("WC_address", req.body.WC_address)
-        .select();
-      const contract = contractSetup(req.body.network);
-      const transaction = await contract.burn(req.body.link_new_address);
-      await transaction.wait();
-    }else{
-    res.json("Sorry Address Not Found");
-
+    console.log("token Id", tokenId);
+    if (Number(tokenId) === 0) {
+      throw new Error("Sorry this address has no SBT !!!");
     }
+    const transaction = await contract.burn(tokenId);
+    await transaction.wait();
+
+    let { data: sepolia_accounts, error } = await supabase
+      .from("User_Accounts")
+      .select("sepolia_accounts")
+      .eq("WC_address", req.body.WC_address);
+    console.log("sepo", sepolia_accounts);
+    const newArray = sepolia_accounts[0].sepolia_accounts.filter(
+      (item) => item !== req.body.link_new_address
+    );
+    const { data, error2 } = await supabase
+      .from("User_Accounts")
+      .update({
+        sepolia_accounts: newArray.length === 0 ? null : newArray,
+      })
+      .eq("WC_address", req.body.WC_address)
+      .select();
+
+    res.status(200).json("Burn SuccessFull !!!");
   } catch (error) {
-    console.log(error)
-    res.json("Something went wrong !!!").status(400);
+    console.log(error.message);
+    if (error.message === "Sorry this address has no SBT !!!") {
+      res.status(400).json(error.message);
+    }
+    res.status(400).json("Something went wrong !!!");
   }
 }
 
