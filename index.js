@@ -18,6 +18,7 @@ const {
 const { flights } = require("./dataSet/sampleData");
 const { stat } = require("fs");
 const { mintSBT } = require("./Components/mintComponent");
+const {burnSBT} = require("./Components/burnSBT");
 
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json({ limit: "10mb" }));
@@ -199,8 +200,12 @@ app.get("/", (req, res) => {
 });
 
 app.post("/mintSBT", (req, res) => {
-  mintSBT(req.body.address, req, res);
+  mintSBT(req, res);
 });
+
+app.post('/burnSBT',(req,res)=>{
+  burnSBT(req,res);
+})
 app.listen("3500", () => {
   console.log("server running at port 3500");
 });
