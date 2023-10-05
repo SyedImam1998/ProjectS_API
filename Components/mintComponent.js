@@ -3,6 +3,7 @@ const { supabase } = require("../config/supaBaseConfig");
 
 async function mintSBT(req, res) {
   try {
+    console.log(req.body.network,req.body.link_new_address,req.body.WC_address)
     const contract = contractSetup(req.body.network);
     const transaction = await contract.safeMint(req.body.link_new_address);
     await transaction.wait();

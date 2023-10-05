@@ -1,19 +1,19 @@
-const {supabase} = require('../config/supaBaseConfig');
+const { supabase } = require("../config/supaBaseConfig");
 
 async function saveToSupabase(tableName, uploaddData) {
-    const { data, error } = await supabase
-      .from(tableName) // Adjust the table name as needed
-      .insert(uploaddData); // Keep [uploaddData] when you are send non array data or just uploaddData
-  
-    console.log("data", data);
-  
-    if (error) {
-      console.error("Error saving data to Supabase:", error);
-      throw new Error("Something went wrong while saving");
-      // return { success: false, error };
-    }
-  
-    return { success: true, data };
+  const { data, error } = await supabase
+    .from(tableName) // Adjust the table name as needed
+    .insert(uploaddData); // Keep [uploaddData] when you are send non array data or just uploaddData
+
+  console.log("data", data);
+
+  if (error) {
+    console.error("Error saving data to Supabase:", error);
+    throw new Error("Something went wrong while saving");
+    // return { success: false, error };
+  }
+
+  return { success: true, data };
 }
 
 function extractDetails(text) {
@@ -59,33 +59,38 @@ function extractDetails(text) {
   };
 }
 
-// To Fetch Data from Flight_Price_Changes Table 
-async function fetch_Flights_from_DB(){
- const flightsDB = await supabase
+// To Fetch Data from Flight_Price_Changes Table
+async function fetch_Flights_from_DB() {
+  const flightsDB = await supabase
     .from("Flight_Price_Changes")
-    .select("Flight_ID,Airline,Origin,Destination,Departure_Date_Time,Price_At_Time");
-    return flightsDB.data;
+    .select(
+      "Flight_ID,Airline,Origin,Destination,Departure_Date_Time,Price_At_Time"
+    );
+  return flightsDB.data;
 }
 
+async function upsertSupbase(tableName, uploadData) {
+  const { data, error } = await supabase
+    .from("Flight_Average_Price")
+    .upsert(uploadData, { onConflict: ["Flight_ID"] })
+    .select();
 
-
-async function upsertSupbase(tableName,uploadData){ 
-const { data, error } = await supabase
-.from("Flight_Average_Price")
-.upsert(uploadData,{ onConflict: ['Flight_ID'] })
-.select()
-
-if (error) {
-  console.error("Error saving data to Supabase:", error);
-  throw new Error("Something went wrong while saving");
-  // return { success: false, error };
+  if (error) {
+    console.error("Error saving data to Supabase:", error);
+    throw new Error("Something went wrong while saving");
+    // return { success: false, error };
+  }
 }
 
-}
-
-function copyProperties_from_one_to_another_Array(sourceArray,destinationArray,propertiesToCopy){
-  const finalResult = destinationArray.map(destObj => {
-    const sourceObj = sourceArray.find(srcObj => srcObj.Flight_ID === destObj.Flight_ID);
+function copyProperties_from_one_to_another_Array(
+  sourceArray,
+  destinationArray,
+  propertiesToCopy
+) {
+  const finalResult = destinationArray.map((destObj) => {
+    const sourceObj = sourceArray.find(
+      (srcObj) => srcObj.Flight_ID === destObj.Flight_ID
+    );
     if (sourceObj) {
       const updatedProps = propertiesToCopy.reduce((props, prop) => {
         props[prop] = sourceObj[prop];
@@ -98,7 +103,7 @@ function copyProperties_from_one_to_another_Array(sourceArray,destinationArray,p
   return finalResult;
 }
 
-function flight_Price_Average_Calculator(flightsDB){
+function flight_Price_Average_Calculator(flightsDB) {
   const flightPriceSumMap = new Map();
   const flightCountMap = new Map();
 
@@ -129,26 +134,34 @@ function flight_Price_Average_Calculator(flightsDB){
 
     averagePrices.push({ Flight_ID, Average_Price: formattedAveragePrice });
   });
-  console.log("Avg Price",averagePrices);
-
+  console.log("Avg Price", averagePrices);
 
   return averagePrices;
 }
 
-function modifyExistingPropertyName(arrayOfObjects,current,updateTo){
-  const updatedArrayOfObjects = arrayOfObjects.map(obj => {
+function modifyExistingPropertyName(arrayOfObjects, current, updateTo) {
+  const updatedArrayOfObjects = arrayOfObjects.map((obj) => {
     const { [current]: currentProp, ...rest } = obj;
     return { [updateTo]: currentProp, ...rest };
   });
   return updatedArrayOfObjects;
 }
 
-function calculateDateTillDepature(flights){
+function calculateDateTillDepature(flights) {
   const today = new Date();
-  const flightInfoWithAverages = flights.map(flight => {
-    const { Flight_ID, Airline, Origin, Destination, Departure_Date_Time, Average_Price } = flight;
+  const flightInfoWithAverages = flights.map((flight) => {
+    const {
+      Flight_ID,
+      Airline,
+      Origin,
+      Destination,
+      Departure_Date_Time,
+      Average_Price,
+    } = flight;
     const departureDate = new Date(Departure_Date_Time);
-    const daysTillDeparture = Math.floor((departureDate - today) / (1000 * 60 * 60 * 24));
+    const daysTillDeparture = Math.floor(
+      (departureDate - today) / (1000 * 60 * 60 * 24)
+    );
     return {
       Flight_ID,
       Airline,
@@ -156,18 +169,55 @@ function calculateDateTillDepature(flights){
       Destination,
       Date: Departure_Date_Time,
       Average_Price,
-      Days_Till_Departure: daysTillDeparture
+      Days_Till_Departure: daysTillDeparture,
     };
   });
   return flightInfoWithAverages;
 }
-  module.exports={
-    saveToSupabase:saveToSupabase,
-    extractDetails:extractDetails,
-    fetch_Flights_from_DB:fetch_Flights_from_DB,
-    upsertSupbase:upsertSupbase,
-    copyProperties_from_one_to_another_Array:copyProperties_from_one_to_another_Array,
-    flight_Price_Average_Calculator:flight_Price_Average_Calculator,
-    modifyExistingPropertyName:modifyExistingPropertyName,
-    calculateDateTillDepature:calculateDateTillDepature,
+
+async function addUser(req, res) {
+  try {
+    const { data, error } = await supabase
+      .from("User_Accounts")
+      .select("*")
+      .eq("WC_address", req.body.worldId);
+
+    console.log(data);
+    if (error) {
+      throw new Error("Supabase Errro");
+    }
+
+    if (data && data.length === 0) {
+      const { data: insertData, error: insertError } = await supabase
+        .from("User_Accounts")
+        .insert([
+          {
+            WC_address: req.body.worldId,
+            // Add other columns and values as needed
+          },
+        ]);
+
+      if (insertError) {
+        throw new Error("Error while saving user address");
+      }
+      res.status(200).json("User Address Saved");
+    } else {
+      // throw new Error("Address Already present");
+      res.status(200).json("Address Already present")
+    }
+  } catch (e) {
+    throw e;
   }
+}
+module.exports = {
+  saveToSupabase: saveToSupabase,
+  extractDetails: extractDetails,
+  fetch_Flights_from_DB: fetch_Flights_from_DB,
+  upsertSupbase: upsertSupbase,
+  copyProperties_from_one_to_another_Array:
+    copyProperties_from_one_to_another_Array,
+  flight_Price_Average_Calculator: flight_Price_Average_Calculator,
+  modifyExistingPropertyName: modifyExistingPropertyName,
+  calculateDateTillDepature: calculateDateTillDepature,
+  addUser: addUser,
+};

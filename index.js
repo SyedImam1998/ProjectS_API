@@ -14,11 +14,12 @@ const {
   copyProperties_from_one_to_another_Array,
   upsertSupbase,
   calculateDateTillDepature,
+  addUser,
 } = require("./helper/helperFunctions");
 const { flights } = require("./dataSet/sampleData");
 const { stat } = require("fs");
 const { mintSBT } = require("./Components/mintComponent");
-const {burnSBT} = require("./Components/burnSBT");
+const { burnSBT } = require("./Components/burnSBT");
 
 app.use(bodyParser.urlencoded({ extended: false }));
 app.use(bodyParser.json({ limit: "10mb" }));
@@ -203,9 +204,18 @@ app.post("/mintSBT", (req, res) => {
   mintSBT(req, res);
 });
 
-app.post('/burnSBT',(req,res)=>{
-  burnSBT(req,res);
-})
+app.post("/addUser", async(req, res) => {
+  try {
+    await addUser(req, res);
+  } catch (e) {
+    console.log(e.message);
+    res.status(400).json(e.message)
+  }
+});
+
+app.post("/burnSBT", (req, res) => {
+  burnSBT(req, res);
+});
 app.listen("3500", () => {
   console.log("server running at port 3500");
 });
